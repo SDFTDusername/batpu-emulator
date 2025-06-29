@@ -1,0 +1,9 @@
+[package]
+name = "batpu-emulator"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+batpu-assembler = { git = "https://github.com/SDFTDusername/batpu-assembler.git", version = "0.0.1" }
+batpu-assembly = { git = "https://github.com/SDFTDusername/batpu-assembly.git", version = "0.0.1" }
+rand = "0.9.1"
