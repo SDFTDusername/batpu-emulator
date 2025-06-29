@@ -42,7 +42,7 @@ impl Screen {
     pub fn set_pix(&mut self, value: bool) {
         let (byte, bit) = self.get_index(self.x, self.y);
         
-        if (value) {
+        if value {
             self.data[byte] |= 1 << bit;
         } else {
             self.data[byte] &= !(1 << bit);

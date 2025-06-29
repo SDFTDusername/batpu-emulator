@@ -1,15 +1,14 @@
-use std::arch::x86_64::__cpuid;
+use crate::components::character_display::CharacterDisplay;
+use crate::components::number_display::NumberDisplay;
+use crate::components::screen::Screen;
+use crate::stack::Stack;
 use batpu_assembly::components::condition::Condition;
 use batpu_assembly::components::location::Location;
 use batpu_assembly::components::register::Register;
 use batpu_assembly::instruction::Instruction;
 use batpu_assembly::InstructionVec;
-use rand::{rng, Rng, RngCore};
 use rand::rngs::ThreadRng;
-use crate::character_display::CharacterDisplay;
-use crate::number_display::NumberDisplay;
-use crate::screen::Screen;
-use crate::stack::Stack;
+use rand::{rng, Rng};
 
 const CHARACTERS: &[char] = &[' ', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '.', '!', '?'];
 
@@ -326,10 +325,10 @@ impl Machine {
                 247 => { self.character_display.push(CHARACTERS.get(value as usize)); },
                 248 => self.character_display.push_buffer(),
                 249 => self.character_display.clear_buffer(),
-                250 => self.number_display.show(value),
+                250 => self.number_display.set_value(value),
                 251 => self.number_display.clear(),
-                252 => self.number_display.set_signed(true),
-                253 => self.number_display.set_signed(false),
+                252 => self.number_display.signed = true,
+                253 => self.number_display.signed = false,
                 254 => (),
                 255 => (),
                 _ => panic!("I/O address {} not implemented", address)

@@ -1,13 +1,11 @@
+use crate::machine::Machine;
 use batpu_assembler::assembler::Assembler;
 use batpu_assembler::assembler_config::AssemblerConfig;
 use batpu_assembly::binary_to_instructions;
-use crate::machine::Machine;
 
 mod machine;
 mod stack;
-mod screen;
-mod character_display;
-mod number_display;
+mod components;
 
 fn main() {
     let mut assembler = Assembler::new(AssemblerConfig::default());
