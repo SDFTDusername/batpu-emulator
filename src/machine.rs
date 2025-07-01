@@ -59,7 +59,7 @@ impl Machine {
         self.running
     }
     
-    pub fn reset_and_start(&mut self) {
+    pub fn start(&mut self) {
         self.registers.fill(0);
         self.memory.fill(0);
         self.stack.clear();
@@ -74,6 +74,7 @@ impl Machine {
         self.program_counter = 0;
         self.running = true;
     }
+    
 
     pub fn tick(&mut self) {
         if !self.running {
@@ -252,6 +253,10 @@ impl Machine {
         &self.registers
     }
 
+    pub fn program_counter(&self) -> usize {
+        self.program_counter
+    }
+
     pub fn memory(&self) -> &[u8] {
         &self.memory
     }
@@ -262,6 +267,18 @@ impl Machine {
     
     pub fn carry_flag(&self) -> bool {
         self.carry_flag
+    }
+    
+    pub fn screen(&self) -> &Screen {
+        &self.screen
+    }
+
+    pub fn character_display(&self) -> &CharacterDisplay {
+        &self.character_display
+    }
+
+    pub fn number_display(&self) -> &NumberDisplay {
+        &self.number_display
     }
 
     fn reg(&self, register: &Register) -> u8 {
@@ -283,7 +300,7 @@ impl Machine {
     }
 
     fn mem(&mut self, address: isize) -> u8 {
-        let address = address.rem_euclid(self.memory.len() as isize) as usize;
+        let address = address.rem_euclid(256) as usize;
         
         if address >= 240 {
             return match address {
@@ -311,8 +328,8 @@ impl Machine {
     }
 
     fn set_mem(&mut self, address: isize, value: u8) {
-        let address = address.rem_euclid(self.memory.len() as isize) as usize;
-
+        let address = address.rem_euclid(256) as usize;
+        
         if address >= 240 {
             match address {
                 240 => self.screen.x = value as isize,

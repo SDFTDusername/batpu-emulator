@@ -6,4 +6,5 @@ edition = "2024"
 [dependencies]
 batpu-assembler = { git = "https://github.com/SDFTDusername/batpu-assembler.git", version = "0.0.1" }
 batpu-assembly = { git = "https://github.com/SDFTDusername/batpu-assembly.git", version = "0.0.1" }
+iced = { version = "0.13.1", features = ["smol", "image", "advanced"] }
 rand = "0.9.1"
