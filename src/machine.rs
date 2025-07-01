@@ -248,17 +248,9 @@ impl Machine {
 
         self.program_counter += 1;
     }
-    
-    pub fn registers(&self) -> &[u8] {
-        &self.registers
-    }
 
     pub fn program_counter(&self) -> usize {
         self.program_counter
-    }
-
-    pub fn memory(&self) -> &[u8] {
-        &self.memory
     }
     
     pub fn zero_flag(&self) -> bool {
@@ -267,6 +259,22 @@ impl Machine {
     
     pub fn carry_flag(&self) -> bool {
         self.carry_flag
+    }
+
+    pub fn registers(&self) -> &[u8] {
+        &self.registers
+    }
+    
+    pub fn registers_mut(&mut self) -> &mut [u8] {
+        &mut self.registers
+    }
+
+    pub fn memory(&self) -> &[u8] {
+        &self.memory
+    }
+
+    pub fn memory_mut(&mut self) -> &mut [u8] {
+        &mut self.memory
     }
     
     pub fn screen(&self) -> &Screen {

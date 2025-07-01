@@ -2,19 +2,35 @@ use crate::machine::Machine;
 use batpu_assembler::assembler::Assembler;
 use batpu_assembler::assembler_config::AssemblerConfig;
 use iced::widget::image::FilterMethod;
-use iced::widget::{column, row, slider, text, Column, Image, Scrollable};
-use iced::Subscription;
+use iced::widget::pane_grid::Axis;
+use iced::widget::{column, container, horizontal_space, pane_grid, row, scrollable, slider, text, text_input, Column, Image};
 use iced::{time, Length};
+use iced::{Element, Subscription};
 use std::time::{Duration, Instant};
 
 mod machine;
 mod stack;
 mod components;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone)]
 enum Message {
+    None,
     Tick,
-    ChangeIPS(u64)
+    SetIPS(u64),
+    SetRegisterValue(usize, u8),
+    SetMemoryValue(usize, u8),
+    PaneDragged(pane_grid::DragEvent),
+    PaneResized(pane_grid::ResizeEvent)
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum Pane {
+    Display,
+    Controller,
+    Info,
+    Assembly,
+    Registers,
+    Memory
 }
 
 struct App {
@@ -24,12 +40,14 @@ struct App {
     previous_time: Instant,
     remaining_nanos: u128,
 
-    machine: Machine
+    machine: Machine,
+    panes: pane_grid::State<Pane>
 }
 
 impl App {
     fn update(&mut self, message: Message) {
         match message {
+            Message::None => {},
             Message::Tick => {
                 let current_time = Instant::now();
                 let delta_time_nanos = current_time.duration_since(self.previous_time).as_nanos();
@@ -46,8 +64,21 @@ impl App {
                     self.tick();
                 }
             },
-            Message::ChangeIPS(ips) => {
+            Message::SetIPS(ips) => {
                 self.instructions_per_second = ips;
+            },
+            Message::SetRegisterValue(i, value) => {
+                self.machine.registers_mut()[i] = value;
+            },
+            Message::SetMemoryValue(i, value) => {
+                self.machine.memory_mut()[i] = value;
+            },
+            Message::PaneDragged(pane_grid::DragEvent::Dropped { pane, target }) => {
+                self.panes.drop(pane, target);
+            },
+            Message::PaneDragged(_) => {},
+            Message::PaneResized(pane_grid::ResizeEvent { split, ratio }) => {
+                self.panes.resize(split, ratio);
             }
         }
     }
@@ -61,52 +92,125 @@ impl App {
         self.age += 1;
     }
 
-    fn view(&self) -> Column<Message> {
-        let handle = self.machine.screen().handle();
-        let image = Image::new(handle).width(Length::Fill).height(Length::Fill).filter_method(FilterMethod::Nearest);
+    fn view(&self) -> Element<'_, Message> {
+        pane_grid(&self.panes, |_, state, _| {
+            pane_grid::Content::new(match state {
+                Pane::Display => {
+                    let screen_handle = self.machine.screen().handle();
 
-        let mut registers_column: Column<Message> = Column::with_capacity(self.machine.registers().len());
+                    // Border of image are cut off because of a cheap hack in iced/wgpu/src/image/mod.rs (Line 598)
+                    let screen_image = Image::new(screen_handle)
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                        .filter_method(FilterMethod::Nearest);
 
-        for (i, &register) in self.machine.registers().iter().enumerate() {
-            registers_column = registers_column.push(text(format!("r{}: {}", i, register)));
-        }
+                    container(
+                        column![
+                            row![
+                                text(format!("\"{}\"", self.machine.character_display().data())),
+                                horizontal_space(),
+                                text(self.machine.number_display().value())
+                            ],
+                            screen_image
+                        ]
+                    )
+                },
+                Pane::Controller => {
+                    container(text("Controller"))
+                },
+                Pane::Info => {
+                    container(
+                        column![
+                            row![
+                                text("Instructions Per Second: "),
+                                text_input("Input 0-10,000", self.instructions_per_second.to_string().as_str())
+                                    .on_input(move |value| { // on_submit doesn't take functions
+                                    let value = value.parse::<u64>();
+                                    if let Ok(value) = value {
+                                        if (0..=10_000).contains(&value) {
+                                            return Message::SetIPS(value);
+                                        }
+                                    }
 
-        let register_scrollable: Scrollable<Message> = Scrollable::new(registers_column)
-            .width(Length::Fill)
-            .height(Length::Fixed(210.0));
+                                    Message::None
+                                })
+                                .width(Length::Fill)
+                            ],
+                            slider(0.0..=1_000.0, self.instructions_per_second as f32, |ips| Message::SetIPS(ips as u64)),
+                            text(format!("Program Counter: {}", self.machine.program_counter())),
+                            text(format!("Zero Flag: {}", self.machine.zero_flag())),
+                            text(format!("Carry Flag: {}", self.machine.carry_flag()))
+                        ]
+                    )
+                },
+                Pane::Assembly => {
+                    container(text("Assembly"))
+                },
+                Pane::Registers => {
+                    let registers = self.machine.registers();
+                    let mut registers_column: Column<Message> = Column::with_capacity(registers.len())
+                        .width(Length::Fill);
 
-        let mut memory_column: Column<Message> = Column::with_capacity(self.machine.memory().len());
+                    for (i, &register) in registers.iter().enumerate() {
+                        registers_column = registers_column.push(
+                            row![
+                                text(format!("r{}: ", i)),
+                                text_input("Input 0-255", register.to_string().as_str())
+                                    .on_input(move |value| { // on_submit doesn't take functions
+                                    let value = value.parse::<u8>();
+                                    if let Ok(value) = value {
+                                        return Message::SetRegisterValue(i, value);
+                                    }
 
-        for (i, &memory) in self.machine.memory().iter().enumerate() {
-            memory_column = memory_column.push(text(format!("{}: {}", i, memory)));
-        }
+                                    Message::None
+                                })
+                                .width(Length::Fill)
+                            ]
+                        );
+                    }
 
-        let memory_scrollable: Scrollable<Message> = Scrollable::new(memory_column)
-            .width(Length::Fill)
-            .height(Length::Fixed(210.0));
+                    container(
+                        column![
+                            text("Registers:"),
+                            scrollable(registers_column)
+                        ]
+                    )
+                },
+                Pane::Memory => {
+                    let memory = self.machine.memory();
+                    let mut memory_column: Column<Message> = Column::with_capacity(memory.len())
+                        .width(Length::Fill);
 
-        column![
-            text(format!("Running: {}", self.machine.running())),
-            text(format!("Age: {}", self.age)),
-            text(format!("PC: {}", self.machine.program_counter())),
-            text(format!("Zero: {}", self.machine.zero_flag())),
-            text(format!("Carry: {}", self.machine.carry_flag())),
-            text(format!("Characters: \"{}\"", self.machine.character_display().data())),
-            text(format!("Number: {}", self.machine.number_display().value())),
-            text(format!("Instructions per second: {}", self.instructions_per_second)),
-            slider(0.0..=1_000.0, self.instructions_per_second as f32, |ips| Message::ChangeIPS(ips as u64)).width(Length::Fill),
-            image,
-            row![
-                column![
-                    text("Registers:"),
-                    register_scrollable
-                ],
-                column![
-                    text("Memory:"),
-                    memory_scrollable
-                ]
-            ]
-        ]
+                    for (i, &value) in memory.iter().enumerate() {
+                        memory_column = memory_column.push(
+                            row![
+                                text(format!("{}: ", i)),
+                                text_input("Input 0-255", value.to_string().as_str())
+                                    .on_input(move |value| { // on_submit doesn't take functions
+                                    let value = value.parse::<u8>();
+                                    if let Ok(value) = value {
+                                        return Message::SetMemoryValue(i, value);
+                                    }
+
+                                    Message::None
+                                })
+                                .width(Length::Fill)
+                            ]
+                        );
+                    }
+
+                    container(
+                        column![
+                            text("Memory:"),
+                            scrollable(memory_column)
+                        ]
+                    )
+                }
+            })
+        })
+            .on_drag(Message::PaneDragged)
+            .on_resize(10, Message::PaneResized)
+            .into()
     }
 
     fn subscription(&self) -> Subscription<Message> {
@@ -125,6 +229,13 @@ impl Default for App {
         let mut machine = Machine::new(instructions);
         machine.start();
 
+        let (mut panes, screen_pane) = pane_grid::State::new(Pane::Display);
+        let (info_pane, _) = panes.split(Axis::Vertical, screen_pane, Pane::Info).unwrap();
+        let (registers_pane, _) = panes.split(Axis::Vertical, info_pane, Pane::Registers).unwrap();
+        panes.split(Axis::Horizontal, screen_pane, Pane::Controller).unwrap();
+        panes.split(Axis::Horizontal, info_pane, Pane::Assembly).unwrap();
+        panes.split(Axis::Horizontal, registers_pane, Pane::Memory).unwrap();
+
         Self {
             instructions_per_second: 100,
             age: 0,
@@ -132,13 +243,15 @@ impl Default for App {
             previous_time: Instant::now(),
             remaining_nanos: 0,
 
-            machine
+            machine,
+
+            panes
         }
     }
 }
 
 fn main() -> iced::Result {
-    iced::application("a meow", App::update, App::view)
+    iced::application("BatPU Emulator v0.0.1", App::update, App::view)
         .subscription(App::subscription)
         .run()
 }

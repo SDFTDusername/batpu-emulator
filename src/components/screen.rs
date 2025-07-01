@@ -11,7 +11,7 @@ pub struct Screen {
     
     buffer: Vec<u8>,
     handle: Handle,
-    
+
     pub off_color: Color,
     pub on_color: Color
 }
@@ -19,16 +19,16 @@ pub struct Screen {
 impl Screen {
     pub fn new(width: usize, height: usize) -> Self {
         let data_length = ((width * height) as f32 / 8.0).ceil() as usize;
-        
+
         let off_color = Color::from_rgb8(158, 92, 56);
         let on_color = Color::from_rgb8(242, 176, 111);
-        
+
         let bytes = Self::gen_rgba(
             width, height,
             off_color, on_color,
             &vec![0; width * height]
         );
-        
+
         let handle = Handle::from_rgba(width as u32, height as u32, bytes);
 
         Self {
@@ -40,7 +40,7 @@ impl Screen {
             
             buffer: vec![0; data_length],
             handle,
-            
+
             off_color,
             on_color
         }
@@ -76,7 +76,7 @@ impl Screen {
             self.off_color, self.on_color,
             &self.buffer
         );
-        
+
         let handle = Handle::from_rgba(self.width as u32, self.height as u32, bytes);
         self.handle = handle;
     }
@@ -106,10 +106,10 @@ impl Screen {
 
     fn gen_rgba(width: usize, height: usize, off_color: Color, on_color: Color, data: &[u8]) -> Bytes {
         let mut bytes: Vec<u8> = Vec::with_capacity(width * height * 4);
-        
+
         for y in 0..height {
             for x in 0..width {
-                let (byte, bit) = Self::get_index(width as isize, height as isize, x as isize, y as isize);
+                let (byte, bit) = Self::get_index(width as isize, height as isize, x as isize, (height - 1 - y) as isize);
 
                 if ((data[byte] >> bit) & 1) != 0 {
                     bytes.push((on_color.r * 255.0) as u8);
@@ -124,7 +124,7 @@ impl Screen {
                 }
             }
         }
-        
+
         Bytes::copy_from_slice(&bytes)
     }
     
