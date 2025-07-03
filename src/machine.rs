@@ -280,6 +280,10 @@ impl Machine {
     pub fn screen(&self) -> &Screen {
         &self.screen
     }
+    
+    pub fn screen_mut(&mut self) -> &mut Screen {
+        &mut self.screen
+    }
 
     pub fn character_display(&self) -> &CharacterDisplay {
         &self.character_display
