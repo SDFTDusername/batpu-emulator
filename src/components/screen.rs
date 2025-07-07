@@ -1,5 +1,3 @@
-use egui::{Color32, ColorImage};
-
 pub struct Screen {
     pub x: isize,
     pub y: isize,
@@ -9,21 +7,13 @@ pub struct Screen {
     
     buffer: Vec<u8>,
     
-    image: ColorImage,
-    image_updated: bool,
-
-    pub off_color: Color32,
-    pub on_color: Color32
+    image: Vec<u8>,
+    image_updated: bool
 }
 
 impl Screen {
     pub fn new(width: usize, height: usize) -> Self {
         let data_length = ((width * height) as f32 / 8.0).ceil() as usize;
-
-        let off_color = Color32::from_rgb(158, 92, 56);
-        let on_color = Color32::from_rgb(242, 176, 111);
-
-        let image = ColorImage::new([width, height], off_color);
 
         Self {
             x: 0,
@@ -34,11 +24,8 @@ impl Screen {
             
             buffer: vec![0; data_length],
             
-            image,
-            image_updated: true,
-
-            off_color,
-            on_color
+            image: vec![0; data_length],
+            image_updated: true
         }
     }
     
@@ -67,20 +54,7 @@ impl Screen {
     }
     
     pub fn push_buffer(&mut self) {
-        for y in 0..self.height {
-            for x in 0..self.width {
-                let (byte, bit) = self.get_index(x as isize, y as isize);
-
-                let color = if ((self.buffer[byte] >> bit) & 1) != 0 {
-                    self.on_color
-                } else {
-                    self.off_color
-                };
-
-                self.image[(x, (self.height - 1 - y))] = color;
-            }
-        }
-
+        self.image.copy_from_slice(&self.buffer);
         self.image_updated = true;
     }
     
@@ -90,14 +64,13 @@ impl Screen {
     
     pub fn clear(&mut self) {
         self.buffer.fill(0);
-
-        let image = ColorImage::new([self.width, self.height], self.off_color);
-        self.image = image;
+        
+        self.image.fill(0);
         self.image_updated = true;
     }
 
-    pub fn image(&self) -> ColorImage {
-        self.image.clone()
+    pub fn image(&self) -> &[u8] {
+        &self.image
     }
     
     pub fn image_updated(&self) -> bool {

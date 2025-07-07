@@ -1,22 +1,24 @@
+use batpu_assembly::components::address;
+
 pub struct Stack {
-    max_size: usize,
-    stack: Vec<usize>
+    max_size: u32,
+    stack: Vec<u32>
 }
 
 impl Stack {
-    pub fn new(max_size: usize) -> Self {
+    pub fn new(max_size: u32) -> Self {
         Self {
             max_size,
-            stack: Vec::with_capacity(max_size)
+            stack: Vec::with_capacity(max_size as usize)
         }
     }
     
-    pub fn push(&mut self, address: usize) -> bool {
-        if address > 1023 {
-            panic!("Address {} out of range, expected 0-1023", address);
+    pub fn push(&mut self, address: u32) -> bool {
+        if address > address::MAX_VALUE {
+            panic!("Address {} out of range, expected 0-{}", address, address::MAX_VALUE);
         }
         
-        if self.stack.len() == self.max_size {
+        if self.stack.len() as u32 == self.max_size {
             return false;
         }
         
@@ -24,7 +26,7 @@ impl Stack {
         true
     }
     
-    pub fn pop(&mut self) -> Option<usize> {
+    pub fn pop(&mut self) -> Option<u32> {
         self.stack.pop()
     }
     

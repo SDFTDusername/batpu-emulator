@@ -2,6 +2,7 @@ use crate::components::character_display::CharacterDisplay;
 use crate::components::number_display::NumberDisplay;
 use crate::components::screen::Screen;
 use crate::stack::Stack;
+use batpu_assembly::components::address;
 use batpu_assembly::components::condition::Condition;
 use batpu_assembly::components::location::Location;
 use batpu_assembly::components::register::Register;
@@ -12,14 +13,19 @@ use rand::{rng, Rng};
 
 const CHARACTERS: &[char] = &[' ', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '.', '!', '?'];
 
+const PORTS: usize = 16;
+const REGISTER_COUNT: usize = 16;
+const MEMORY_SIZE: usize = 256;
+const USABLE_MEMORY_SIZE: usize = MEMORY_SIZE - PORTS;
+
 pub struct Machine {
     rng: ThreadRng,
 
-    program_counter: usize,
+    program_counter: u32,
     running: bool,
 
-    registers: [u8; 16],
-    memory: [u8; 240], // Memory Size (256) - Port Count (16) = 240
+    registers: [u8; REGISTER_COUNT],
+    memory: [u8; USABLE_MEMORY_SIZE],
     stack: Stack,
     
     zero_flag: bool,
@@ -40,8 +46,8 @@ impl Machine {
             program_counter: 0,
             running: false,
 
-            registers: [0; 16],
-            memory: [0; 240],
+            registers: [0; REGISTER_COUNT],
+            memory: [0; USABLE_MEMORY_SIZE],
             stack: Stack::new(16),
             
             zero_flag: false,
@@ -81,12 +87,16 @@ impl Machine {
             return;
         }
         
-        if self.program_counter >= self.instructions.len() {
-            self.running = false;
-            return;
+        if self.program_counter >= self.instructions.len() as u32 {
+            if self.program_counter > address::MAX_VALUE {
+                self.program_counter = self.program_counter.rem_euclid(address::MAX_POSSIBLE_COUNT);
+            } else {
+                self.program_counter += 1;
+                return;
+            }
         }
 
-        let instruction = self.instructions[self.program_counter].clone();
+        let instruction = self.instructions[self.program_counter as usize].clone();
 
         match instruction {
             Instruction::Halt => {
@@ -159,7 +169,7 @@ impl Machine {
             Instruction::LoadImmediate(a, immediate) => {
                 self.set_reg(
                     &a,
-                    immediate.immediate()
+                    immediate.immediate() as u8
                 );
             },
             Instruction::AddImmediate(a, immediate) => {
@@ -177,8 +187,11 @@ impl Machine {
             Instruction::Jump(location) => {
                 match location {
                     Location::Address(address) => {
-                        self.program_counter = address.address() as usize;
+                        self.program_counter = address.address();
                         return;
+                    },
+                    Location::Offset(_) => {
+                        panic!("Attempted to jump to an offset");
                     },
                     Location::Label(_) => {
                         panic!("Attempted to jump to a label");
@@ -196,8 +209,11 @@ impl Machine {
                 if condition_met {
                     match location {
                         Location::Address(address) => {
-                            self.program_counter = address.address() as usize;
+                            self.program_counter = address.address();
                             return;
+                        },
+                        Location::Offset(_) => {
+                            panic!("Attempted to jump to an offset");
                         },
                         Location::Label(_) => {
                             panic!("Attempted to jump to a label");
@@ -209,8 +225,11 @@ impl Machine {
                 match location {
                     Location::Address(address) => {
                         self.stack.push(self.program_counter + 1);
-                        self.program_counter = address.address() as usize;
+                        self.program_counter = address.address();
                         return;
+                    },
+                    Location::Offset(_) => {
+                        panic!("Attempted to jump to an offset");
                     },
                     Location::Label(_) => {
                         panic!("Attempted to jump to a label");
@@ -249,7 +268,7 @@ impl Machine {
         self.program_counter += 1;
     }
 
-    pub fn program_counter(&self) -> usize {
+    pub fn program_counter(&self) -> u32 {
         self.program_counter
     }
     
