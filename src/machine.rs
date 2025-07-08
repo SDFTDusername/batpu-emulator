@@ -26,7 +26,7 @@ pub struct Machine {
     rng: ThreadRng,
 
     program_counter: u32,
-    running: bool,
+    halt: bool,
 
     registers: [Word; REGISTER_COUNT],
     memory: [Word; USABLE_MEMORY_SIZE],
@@ -48,7 +48,7 @@ impl Machine {
             rng: rng(),
 
             program_counter: 0,
-            running: false,
+            halt: false,
 
             registers: [0; REGISTER_COUNT],
             memory: [0; USABLE_MEMORY_SIZE],
@@ -63,10 +63,6 @@ impl Machine {
 
             instructions: Vec::new()
         }
-    }
-
-    pub fn running(&self) -> bool {
-        self.running
     }
     
     pub fn reset(&mut self) {
@@ -84,23 +80,11 @@ impl Machine {
         self.program_counter = 0;
     }
     
-    pub fn start(&mut self) {
-        self.running = true;
-    }
-    
-    pub fn stop(&mut self) {
-        self.running = false;
-    }
-    
     pub fn set_instructions(&mut self, instructions: InstructionVec) {
         self.instructions = instructions;
     }
 
     pub fn tick(&mut self) {
-        if !self.running {
-            return;
-        }
-        
         if self.program_counter >= self.instructions.len() as u32 {
             self.program_counter = (self.program_counter + 1).rem_euclid(address::MAX_POSSIBLE_COUNT);
             return;
@@ -112,8 +96,9 @@ impl Machine {
     
     fn run_instruction(&mut self, instruction: &Instruction) {
         match instruction {
+            Instruction::NoOperation => {},
             Instruction::Halt => {
-                self.running = false;
+                self.halt = true;
                 return;
             },
             Instruction::Addition(a, b, c) => {
@@ -272,9 +257,6 @@ impl Machine {
                     self.reg(&a) as i32 + offset.offset(),
                     self.reg(&b)
                 );
-            },
-            _ => {
-                panic!("Unknown instruction \"{:?}\"", instruction)
             }
         }
 
@@ -287,6 +269,14 @@ impl Machine {
     
     pub fn set_program_counter(&mut self, program_counter: u32) {
         self.program_counter = program_counter
+    }
+    
+    pub fn halt(&self) -> bool {
+        self.halt
+    }
+    
+    pub fn set_halt(&mut self, halt: bool) {
+        self.halt = halt;
     }
     
     pub fn zero_flag(&self) -> bool {
