@@ -1,5 +1,7 @@
+use crate::machine::Word;
+
 pub struct NumberDisplay {
-    value: u8,
+    value: Word,
     pub signed: bool
 }
 
@@ -11,15 +13,15 @@ impl NumberDisplay {
         }
     }
 
-    pub fn value(&self) -> isize {
+    pub fn value(&self) -> i32 {
         if self.signed {
-            self.value as isize - 128
+            ((self.value as i32) << (32 - Word::BITS)) >> (32 - Word::BITS)
         } else {
-            self.value as isize
+            self.value as i32
         }
     }
     
-    pub fn set_value(&mut self, value: u8) {
+    pub fn set_value(&mut self, value: Word) {
         self.value = value;
     }
     

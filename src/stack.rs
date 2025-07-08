@@ -33,4 +33,8 @@ impl Stack {
     pub fn clear(&mut self) {
         self.stack.clear();
     }
+    
+    pub fn stack(&self) -> &[u32] {
+        &self.stack
+    }
 }

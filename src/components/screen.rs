@@ -81,7 +81,7 @@ impl Screen {
         self.image_updated = false;
     }
     
-    fn get_index(&self, x: isize, y: isize) -> (usize, usize) {
+    pub fn get_index(&self, x: isize, y: isize) -> (usize, usize) {
         let x = x.rem_euclid(self.width as isize);
         let y = y.rem_euclid(self.height as isize);
 

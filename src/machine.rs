@@ -4,6 +4,7 @@ use crate::components::screen::Screen;
 use crate::stack::Stack;
 use batpu_assembly::components::address;
 use batpu_assembly::components::condition::Condition;
+use batpu_assembly::components::immediate;
 use batpu_assembly::components::location::Location;
 use batpu_assembly::components::register::Register;
 use batpu_assembly::instruction::Instruction;
@@ -11,12 +12,15 @@ use batpu_assembly::InstructionVec;
 use rand::rngs::ThreadRng;
 use rand::{rng, Rng};
 
-const CHARACTERS: &[char] = &[' ', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '.', '!', '?'];
+pub const CHARACTERS: &[char] = &[' ', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '.', '!', '?'];
 
-const PORTS: usize = 16;
-const REGISTER_COUNT: usize = 16;
-const MEMORY_SIZE: usize = 256;
-const USABLE_MEMORY_SIZE: usize = MEMORY_SIZE - PORTS;
+pub const PORTS: usize = 16;
+pub const REGISTER_COUNT: usize = 16;
+pub const MEMORY_SIZE: usize = 256;
+pub const USABLE_MEMORY_SIZE: usize = MEMORY_SIZE - PORTS;
+pub const PORTS_ADDRESS: usize = MEMORY_SIZE - PORTS;
+
+pub type Word = u8;
 
 pub struct Machine {
     rng: ThreadRng,
@@ -24,8 +28,8 @@ pub struct Machine {
     program_counter: u32,
     running: bool,
 
-    registers: [u8; REGISTER_COUNT],
-    memory: [u8; USABLE_MEMORY_SIZE],
+    registers: [Word; REGISTER_COUNT],
+    memory: [Word; USABLE_MEMORY_SIZE],
     stack: Stack,
     
     zero_flag: bool,
@@ -39,7 +43,7 @@ pub struct Machine {
 }
 
 impl Machine {
-    pub fn new(instructions: InstructionVec) -> Self {
+    pub fn new() -> Self {
         Self {
             rng: rng(),
 
@@ -57,7 +61,7 @@ impl Machine {
             character_display: CharacterDisplay::new(10),
             number_display: NumberDisplay::new(),
 
-            instructions
+            instructions: Vec::new()
         }
     }
 
@@ -65,7 +69,7 @@ impl Machine {
         self.running
     }
     
-    pub fn start(&mut self) {
+    pub fn reset(&mut self) {
         self.registers.fill(0);
         self.memory.fill(0);
         self.stack.clear();
@@ -78,9 +82,19 @@ impl Machine {
         self.number_display.clear();
         
         self.program_counter = 0;
+    }
+    
+    pub fn start(&mut self) {
         self.running = true;
     }
     
+    pub fn stop(&mut self) {
+        self.running = false;
+    }
+    
+    pub fn set_instructions(&mut self, instructions: InstructionVec) {
+        self.instructions = instructions;
+    }
 
     pub fn tick(&mut self) {
         if !self.running {
@@ -97,29 +111,32 @@ impl Machine {
         }
 
         let instruction = self.instructions[self.program_counter as usize].clone();
-
+        self.run_instruction(&instruction);
+    }
+    
+    fn run_instruction(&mut self, instruction: &Instruction) {
         match instruction {
             Instruction::Halt => {
                 self.running = false;
                 return;
             },
             Instruction::Addition(a, b, c) => {
-                let result = self.reg(&a) as u16 + self.reg(&b) as u16;
-                self.carry_flag = result > 255;
-                
-                let result_byte = result as u8;
+                let result = self.reg(&a) as u32 + self.reg(&b) as u32;
+                self.carry_flag = result > immediate::MAX_VALUE;
+
+                let result_byte = result as Word;
                 self.zero_flag = result == 0;
-                
+
                 self.set_reg(
                     &c,
                     result_byte
                 );
             },
             Instruction::Subtraction(a, b, c) => {
-                let result = self.reg(&a) as i16 - self.reg(&b) as i16;
+                let result = self.reg(&a) as i32 - self.reg(&b) as i32;
                 self.carry_flag = result >= 0;
 
-                let result_byte = result as u8;
+                let result_byte = result as Word;
                 self.zero_flag = result == 0;
 
                 self.set_reg(
@@ -129,10 +146,10 @@ impl Machine {
             },
             Instruction::BitwiseNOR(a, b, c) => {
                 let result = !(self.reg(&a) | self.reg(&b));
-                
+
                 self.zero_flag = result == 0;
                 self.carry_flag = false;
-                
+
                 self.set_reg(
                     &c,
                     result
@@ -173,12 +190,12 @@ impl Machine {
                 );
             },
             Instruction::AddImmediate(a, immediate) => {
-                let result = self.reg(&a) as usize + immediate.immediate() as usize;
-                self.carry_flag = result > 255;
-                
-                let result_byte = result as u8;
+                let result = self.reg(&a) as u32 + immediate.immediate();
+                self.carry_flag = result > address::MAX_VALUE;
+
+                let result_byte = result as Word;
                 self.zero_flag = result == 0;
-                
+
                 self.set_reg(
                     &a,
                     result_byte
@@ -205,7 +222,7 @@ impl Machine {
                     Condition::Carry    => self.carry_flag,
                     Condition::NotCarry => !self.carry_flag
                 };
-                
+
                 if condition_met {
                     match location {
                         Location::Address(address) => {
@@ -247,7 +264,7 @@ impl Machine {
                 return;
             },
             Instruction::MemoryLoad(a, b, offset) => {
-                let mem = self.mem(self.reg(&a) as isize + offset.offset() as isize);
+                let mem = self.mem(self.reg(&a) as i32 + offset.offset());
 
                 self.set_reg(
                     &b,
@@ -256,7 +273,7 @@ impl Machine {
             },
             Instruction::MemoryStore(a, b, offset) => {
                 self.set_mem(
-                    self.reg(&a) as isize + offset.offset() as isize,
+                    self.reg(&a) as i32 + offset.offset(),
                     self.reg(&b)
                 );
             },
@@ -272,28 +289,48 @@ impl Machine {
         self.program_counter
     }
     
+    pub fn set_program_counter(&mut self, program_counter: u32) {
+        self.program_counter = program_counter
+    }
+    
     pub fn zero_flag(&self) -> bool {
         self.zero_flag
+    }
+    
+    pub fn set_zero_flag(&mut self, zero_flag: bool) {
+        self.zero_flag = zero_flag;
     }
     
     pub fn carry_flag(&self) -> bool {
         self.carry_flag
     }
+    
+    pub fn set_carry_flag(&mut self, carry_flag: bool) {
+        self.carry_flag = carry_flag;
+    }
 
-    pub fn registers(&self) -> &[u8] {
+    pub fn registers(&self) -> &[Word] {
         &self.registers
     }
     
-    pub fn registers_mut(&mut self) -> &mut [u8] {
+    pub fn registers_mut(&mut self) -> &mut [Word] {
         &mut self.registers
     }
 
-    pub fn memory(&self) -> &[u8] {
+    pub fn memory(&self) -> &[Word] {
         &self.memory
     }
 
-    pub fn memory_mut(&mut self) -> &mut [u8] {
+    pub fn memory_mut(&mut self) -> &mut [Word] {
         &mut self.memory
+    }
+    
+    pub fn stack(&self) -> &Stack {
+        &self.stack
+    }
+
+    pub fn stack_mut(&mut self) -> &mut Stack {
+        &mut self.stack
     }
     
     pub fn screen(&self) -> &Screen {
@@ -308,20 +345,24 @@ impl Machine {
         &self.character_display
     }
 
+    pub fn character_display_mut(&mut self) -> &mut CharacterDisplay {
+        &mut self.character_display
+    }
+
     pub fn number_display(&self) -> &NumberDisplay {
         &self.number_display
     }
 
-    fn reg(&self, register: &Register) -> u8 {
+    pub fn number_display_mut(&mut self) -> &mut NumberDisplay {
+        &mut self.number_display
+    }
+
+    fn reg(&self, register: &Register) -> Word {
         let register = register.register();
-        if register == 0 {
-            return 0;
-        }
-        
         self.registers[register as usize]
     }
 
-    fn set_reg(&mut self, register: &Register, value: u8) {
+    fn set_reg(&mut self, register: &Register, value: Word) {
         let register = register.register();
         if register == 0 {
             return;
@@ -330,27 +371,27 @@ impl Machine {
         self.registers[register as usize] = value;
     }
 
-    fn mem(&mut self, address: isize) -> u8 {
-        let address = address.rem_euclid(256) as usize;
+    fn mem(&mut self, address: i32) -> Word {
+        let address = address.rem_euclid(immediate::MAX_POSSIBLE_COUNT as i32) as usize;
         
-        if address >= 240 {
-            return match address {
-                240 => 0,
-                241 => 0,
-                242 => 0,
-                243 => 0,
-                244 => if self.screen.pix() { 1 } else { 0 },
-                245 => 0,
-                246 => 0,
-                247 => 0,
-                248 => 0,
-                249 => 0,
-                250 => 0,
-                251 => 0,
-                252 => 0,
-                253 => 0,
-                254 => self.rng.random(),
-                255 => 0,
+        if address >= PORTS_ADDRESS {
+            return match address - PORTS_ADDRESS {
+                0  => 0,
+                1  => 0,
+                2  => 0,
+                3  => 0,
+                4  => if self.screen.pix() { 1 } else { 0 },
+                5  => 0,
+                6  => 0,
+                7  => 0,
+                8  => 0,
+                9  => 0,
+                10 => 0,
+                11 => 0,
+                12 => 0,
+                13 => 0,
+                14 => self.rng.random(),
+                15 => 0,
                 _ => panic!("I/O address {} not implemented", address)
             }
         }
@@ -358,27 +399,27 @@ impl Machine {
         self.memory[address]
     }
 
-    fn set_mem(&mut self, address: isize, value: u8) {
-        let address = address.rem_euclid(256) as usize;
+    fn set_mem(&mut self, address: i32, value: Word) {
+        let address = address.rem_euclid(immediate::MAX_POSSIBLE_COUNT as i32) as usize;
         
-        if address >= 240 {
-            match address {
-                240 => self.screen.x = value as isize,
-                241 => self.screen.y = value as isize,
-                242 => self.screen.set_pix(true),
-                243 => self.screen.set_pix(false),
-                244 => (),
-                245 => self.screen.push_buffer(),
-                246 => self.screen.clear_buffer(),
-                247 => { self.character_display.push(CHARACTERS.get(value as usize)); },
-                248 => self.character_display.push_buffer(),
-                249 => self.character_display.clear_buffer(),
-                250 => self.number_display.set_value(value),
-                251 => self.number_display.clear(),
-                252 => self.number_display.signed = true,
-                253 => self.number_display.signed = false,
-                254 => (),
-                255 => (),
+        if address >= PORTS_ADDRESS {
+            match address - PORTS_ADDRESS {
+                0  => self.screen.x = value as isize,
+                1  => self.screen.y = value as isize,
+                2  => self.screen.set_pix(true),
+                3  => self.screen.set_pix(false),
+                4  => (),
+                5  => self.screen.push_buffer(),
+                6  => self.screen.clear_buffer(),
+                7  => { self.character_display.push(CHARACTERS.get(value as usize)); },
+                8  => self.character_display.push_buffer(),
+                9  => self.character_display.clear_buffer(),
+                10 => self.number_display.set_value(value),
+                11 => self.number_display.clear(),
+                12 => self.number_display.signed = true,
+                13 => self.number_display.signed = false,
+                14 => (),
+                15 => (),
                 _ => panic!("I/O address {} not implemented", address)
             }
 
