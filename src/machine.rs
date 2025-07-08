@@ -1,4 +1,5 @@
 use crate::components::character_display::CharacterDisplay;
+use crate::components::controller::Controller;
 use crate::components::number_display::NumberDisplay;
 use crate::components::screen::Screen;
 use crate::stack::Stack;
@@ -38,6 +39,7 @@ pub struct Machine {
     screen: Screen,
     character_display: CharacterDisplay,
     number_display: NumberDisplay,
+    controller: Controller,
 
     instructions: InstructionVec
 }
@@ -60,6 +62,7 @@ impl Machine {
             screen: Screen::new(32, 32),
             character_display: CharacterDisplay::new(10),
             number_display: NumberDisplay::new(),
+            controller: Controller::new(),
 
             instructions: Vec::new()
         }
@@ -76,6 +79,7 @@ impl Machine {
         self.screen.clear();
         self.character_display.clear();
         self.number_display.clear();
+        self.controller.clear();
         
         self.program_counter = 0;
     }
@@ -342,6 +346,14 @@ impl Machine {
     pub fn number_display_mut(&mut self) -> &mut NumberDisplay {
         &mut self.number_display
     }
+    
+    pub fn controller(&self) -> &Controller {
+        &self.controller
+    }
+    
+    pub fn controller_mut(&mut self) -> &mut Controller {
+        &mut self.controller
+    }
 
     fn reg(&self, register: &Register) -> Word {
         let register = register.register();
@@ -377,7 +389,7 @@ impl Machine {
                 12 => 0,
                 13 => 0,
                 14 => self.rng.random(),
-                15 => 0,
+                15 => self.controller.binary(),
                 _ => panic!("I/O address {} not implemented", address)
             }
         }
