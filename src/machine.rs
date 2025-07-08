@@ -102,12 +102,8 @@ impl Machine {
         }
         
         if self.program_counter >= self.instructions.len() as u32 {
-            if self.program_counter > address::MAX_VALUE {
-                self.program_counter = self.program_counter.rem_euclid(address::MAX_POSSIBLE_COUNT);
-            } else {
-                self.program_counter += 1;
-                return;
-            }
+            self.program_counter = (self.program_counter + 1).rem_euclid(address::MAX_POSSIBLE_COUNT);
+            return;
         }
 
         let instruction = self.instructions[self.program_counter as usize].clone();
