@@ -2,7 +2,9 @@ pub struct CharacterDisplay {
     capacity: usize,
     
     buffer: String,
-    data: String
+    
+    data: String,
+    data_updated: bool
 }
 
 impl CharacterDisplay {
@@ -11,7 +13,9 @@ impl CharacterDisplay {
             capacity,
             
             buffer: String::with_capacity(capacity),
-            data: String::with_capacity(capacity)
+            
+            data: String::with_capacity(capacity),
+            data_updated: true
         }
     }
     
@@ -39,6 +43,7 @@ impl CharacterDisplay {
     
     pub fn push_buffer(&mut self) {
         self.data.clone_from(&self.buffer);
+        self.data_updated = true;
     }
     
     pub fn clear_buffer(&mut self) {
@@ -47,6 +52,16 @@ impl CharacterDisplay {
     
     pub fn clear(&mut self) {
         self.buffer.clear();
+        
         self.data.clear();
+        self.data_updated = true;
+    }
+
+    pub fn data_updated(&self) -> bool {
+        self.data_updated
+    }
+
+    pub fn disable_data_updated(&mut self) {
+        self.data_updated = false;
     }
 }

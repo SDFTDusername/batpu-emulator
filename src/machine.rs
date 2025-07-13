@@ -2,7 +2,7 @@ use crate::components::character_display::CharacterDisplay;
 use crate::components::controller::Controller;
 use crate::components::number_display::NumberDisplay;
 use crate::components::screen::Screen;
-use crate::stack::Stack;
+use crate::components::stack::Stack;
 use batpu_assembly::components::address;
 use batpu_assembly::components::condition::Condition;
 use batpu_assembly::components::immediate;
@@ -33,8 +33,13 @@ pub struct Machine {
     memory: [Word; USABLE_MEMORY_SIZE],
     stack: Stack,
     
+    registers_updated: bool,
+    memory_updated: bool,
+    
     zero_flag: bool,
     carry_flag: bool,
+    
+    flags_updated: bool,
 
     screen: Screen,
     character_display: CharacterDisplay,
@@ -56,8 +61,13 @@ impl Machine {
             memory: [0; USABLE_MEMORY_SIZE],
             stack: Stack::new(16),
             
+            registers_updated: true,
+            memory_updated: true,
+            
             zero_flag: false,
             carry_flag: false,
+            
+            flags_updated: true,
 
             screen: Screen::new(32, 32),
             character_display: CharacterDisplay::new(10),
@@ -73,8 +83,13 @@ impl Machine {
         self.memory.fill(0);
         self.stack.clear();
         
+        self.registers_updated = true;
+        self.memory_updated = true;
+        
         self.zero_flag = false;
         self.carry_flag = false;
+        
+        self.flags_updated = true;
 
         self.screen.clear();
         self.character_display.clear();
@@ -107,10 +122,10 @@ impl Machine {
             },
             Instruction::Addition(a, b, c) => {
                 let result = self.reg(&a) as u32 + self.reg(&b) as u32;
-                self.carry_flag = result > immediate::MAX_VALUE;
+                self.set_carry_flag(result > immediate::MAX_VALUE);
 
                 let result_byte = result as Word;
-                self.zero_flag = result == 0;
+                self.set_zero_flag(result == 0);
 
                 self.set_reg(
                     &c,
@@ -119,10 +134,10 @@ impl Machine {
             },
             Instruction::Subtraction(a, b, c) => {
                 let result = self.reg(&a) as i32 - self.reg(&b) as i32;
-                self.carry_flag = result >= 0;
+                self.set_carry_flag(result >= 0);
 
                 let result_byte = result as Word;
-                self.zero_flag = result == 0;
+                self.set_zero_flag(result == 0);
 
                 self.set_reg(
                     &c,
@@ -132,8 +147,8 @@ impl Machine {
             Instruction::BitwiseNOR(a, b, c) => {
                 let result = !(self.reg(&a) | self.reg(&b));
 
-                self.zero_flag = result == 0;
-                self.carry_flag = false;
+                self.set_zero_flag(result == 0);
+                self.set_carry_flag(false);
 
                 self.set_reg(
                     &c,
@@ -143,8 +158,8 @@ impl Machine {
             Instruction::BitwiseAND(a, b, c) => {
                 let result = self.reg(&a) & self.reg(&b);
 
-                self.zero_flag = result == 0;
-                self.carry_flag = false;
+                self.set_zero_flag(result == 0);
+                self.set_carry_flag(false);
 
                 self.set_reg(
                     &c,
@@ -154,8 +169,8 @@ impl Machine {
             Instruction::BitwiseXOR(a, b, c) => {
                 let result = self.reg(&a) ^ self.reg(&b);
 
-                self.zero_flag = result == 0;
-                self.carry_flag = false;
+                self.set_zero_flag(result == 0);
+                self.set_carry_flag(false);
 
                 self.set_reg(
                     &c,
@@ -176,10 +191,10 @@ impl Machine {
             },
             Instruction::AddImmediate(a, immediate) => {
                 let result = self.reg(&a) as u32 + immediate.immediate();
-                self.carry_flag = result > address::MAX_VALUE;
+                self.set_carry_flag(result > address::MAX_VALUE);
 
                 let result_byte = result as Word;
-                self.zero_flag = result == 0;
+                self.set_zero_flag(result == 0);
 
                 self.set_reg(
                     &a,
@@ -288,6 +303,10 @@ impl Machine {
     }
     
     pub fn set_zero_flag(&mut self, zero_flag: bool) {
+        if zero_flag != self.zero_flag {
+            self.flags_updated = true;
+        }
+        
         self.zero_flag = zero_flag;
     }
     
@@ -296,6 +315,10 @@ impl Machine {
     }
     
     pub fn set_carry_flag(&mut self, carry_flag: bool) {
+        if carry_flag != self.carry_flag {
+            self.flags_updated = true;
+        }
+        
         self.carry_flag = carry_flag;
     }
 
@@ -355,6 +378,30 @@ impl Machine {
         &mut self.controller
     }
 
+    pub fn registers_updated(&self) -> bool {
+        self.registers_updated
+    }
+
+    pub fn disable_registers_updated(&mut self) {
+        self.registers_updated = false;
+    }
+
+    pub fn memory_updated(&self) -> bool {
+        self.memory_updated
+    }
+
+    pub fn disable_memory_updated(&mut self) {
+        self.memory_updated = false;
+    }
+
+    pub fn flags_updated(&self) -> bool {
+        self.flags_updated
+    }
+
+    pub fn disable_flags_updated(&mut self) {
+        self.flags_updated = false;
+    }
+
     fn reg(&self, register: &Register) -> Word {
         let register = register.register();
         self.registers[register as usize]
@@ -367,6 +414,7 @@ impl Machine {
         }
         
         self.registers[register as usize] = value;
+        self.registers_updated = true;
     }
 
     fn mem(&mut self, address: i32) -> Word {
@@ -425,5 +473,6 @@ impl Machine {
         }
 
         self.memory[address] = value;
+        self.memory_updated = true;
     }
 }
