@@ -118,30 +118,29 @@ impl Machine {
             Instruction::NoOperation => {},
             Instruction::Halt => {
                 self.halt = true;
+                self.program_counter = 0;
                 return;
             },
             Instruction::Addition(a, b, c) => {
-                let result = self.reg(&a) as u32 + self.reg(&b) as u32;
-                self.set_carry_flag(result > immediate::MAX_VALUE);
+                let (result, borrow) = self.reg(&a).overflowing_add(self.reg(&b));
 
-                let result_byte = result as Word;
-                self.set_zero_flag(result_byte == 0);
+                self.set_carry_flag(borrow);
+                self.set_zero_flag(result == 0);
 
                 self.set_reg(
                     &c,
-                    result_byte
+                    result
                 );
             },
             Instruction::Subtraction(a, b, c) => {
-                let result = self.reg(&a) as i32 - self.reg(&b) as i32;
-                self.set_carry_flag(result >= 0);
+                let (result, borrow) = self.reg(&a).overflowing_sub(self.reg(&b));
 
-                let result_byte = result as Word;
-                self.set_zero_flag(result_byte == 0);
+                self.set_carry_flag(!borrow);
+                self.set_zero_flag(result == 0);
 
                 self.set_reg(
                     &c,
-                    result_byte
+                    result
                 );
             },
             Instruction::BitwiseNOR(a, b, c) => {
@@ -190,15 +189,14 @@ impl Machine {
                 );
             },
             Instruction::AddImmediate(a, immediate) => {
-                let result = self.reg(&a) as u32 + immediate.immediate();
-                self.set_carry_flag(result > immediate::MAX_VALUE);
+                let (result, borrow) = self.reg(&a).overflowing_add(immediate.immediate() as Word);
 
-                let result_byte = result as Word;
-                self.set_zero_flag(result_byte == 0);
+                self.set_carry_flag(borrow);
+                self.set_zero_flag(result == 0);
 
                 self.set_reg(
                     &a,
-                    result_byte
+                    result
                 );
             },
             Instruction::Jump(location) => {
@@ -241,7 +239,7 @@ impl Machine {
             Instruction::Call(location) => {
                 match location {
                     Location::Address(address) => {
-                        self.stack.push(self.program_counter + 1);
+                        self.stack.push((self.program_counter + 1).rem_euclid(address::MAX_POSSIBLE_COUNT));
                         self.program_counter = address.address();
                         return;
                     },
