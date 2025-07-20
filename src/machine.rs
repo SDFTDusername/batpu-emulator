@@ -252,13 +252,7 @@ impl Machine {
                 }
             },
             Instruction::Return => {
-                let result = self.stack.pop();
-                match result {
-                    Some(address) => {
-                        self.program_counter = address;
-                    },
-                    None => {}
-                }
+                self.program_counter = self.stack.pop();
                 return;
             },
             Instruction::MemoryLoad(a, b, offset) => {

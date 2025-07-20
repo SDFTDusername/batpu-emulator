@@ -23,7 +23,7 @@ impl Stack {
         }
         
         if self.stack.len() as u32 == self.max_size {
-            return false;
+            self.stack.remove(0);
         }
         
         self.stack.push(address);
@@ -32,14 +32,14 @@ impl Stack {
         true
     }
     
-    pub fn pop(&mut self) -> Option<u32> {
+    pub fn pop(&mut self) -> u32 {
         let result = self.stack.pop();
         match result {
             Some(value) => {
                 self.stack_updated = true;
-                Some(value)
+                value
             },
-            None => None
+            None => 0
         }
     }
     
