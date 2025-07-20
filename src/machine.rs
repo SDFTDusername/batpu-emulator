@@ -191,7 +191,7 @@ impl Machine {
             },
             Instruction::AddImmediate(a, immediate) => {
                 let result = self.reg(&a) as u32 + immediate.immediate();
-                self.set_carry_flag(result > address::MAX_VALUE);
+                self.set_carry_flag(result > immediate::MAX_VALUE);
 
                 let result_byte = result as Word;
                 self.set_zero_flag(result == 0);
