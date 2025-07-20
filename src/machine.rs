@@ -125,7 +125,7 @@ impl Machine {
                 self.set_carry_flag(result > immediate::MAX_VALUE);
 
                 let result_byte = result as Word;
-                self.set_zero_flag(result == 0);
+                self.set_zero_flag(result_byte == 0);
 
                 self.set_reg(
                     &c,
@@ -137,7 +137,7 @@ impl Machine {
                 self.set_carry_flag(result >= 0);
 
                 let result_byte = result as Word;
-                self.set_zero_flag(result == 0);
+                self.set_zero_flag(result_byte == 0);
 
                 self.set_reg(
                     &c,
@@ -194,7 +194,7 @@ impl Machine {
                 self.set_carry_flag(result > immediate::MAX_VALUE);
 
                 let result_byte = result as Word;
-                self.set_zero_flag(result == 0);
+                self.set_zero_flag(result_byte == 0);
 
                 self.set_reg(
                     &a,
